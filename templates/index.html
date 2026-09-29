@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Smart Farming — Crop Recommendation</title>
+<style>
+  :root {
+    --green: #2e7d32;
+    --green-dark: #1b5e20;
+    --bg: #f4f7f4;
+    --card: #ffffff;
+    --text: #263238;
+    --muted: #607d8b;
+    --error: #c62828;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+  .container { width: 100%; max-width: 640px; }
+  h1 {
+    text-align: center;
+    color: var(--green-dark);
+    margin-bottom: 4px;
+    font-size: 1.6rem;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    margin-bottom: 28px;
+    font-size: 0.95rem;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    padding: 28px;
+  }
+  form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .field { display: flex; flex-direction: column; }
+  label { font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+  input[type="number"] {
+    padding: 10px 12px;
+    border: 1px solid #cfd8dc;
+    border-radius: 8px;
+    font-size: 0.95rem;
+  }
+  input[type="number"]:focus { outline: none; border-color: var(--green); }
+  .submit-row { grid-column: 1 / -1; margin-top: 6px; }
+  button {
+    width: 100%;
+    padding: 12px;
+    background: var(--green);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  button:hover { background: var(--green-dark); }
+  .result {
+    margin-top: 22px;
+    padding: 18px;
+    border-radius: 10px;
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    text-align: center;
+  }
+  .result .crop-name {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--green-dark);
+    text-transform: capitalize;
+  }
+  .error {
+    margin-top: 22px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    background: #ffebee;
+    border: 1px solid #ef9a9a;
+    color: var(--error);
+    font-size: 0.9rem;
+  }
+  footer {
+    text-align: center;
+    margin-top: 20px;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .explain {
+    margin-top: 22px;
+    padding: 18px;
+    border-radius: 10px;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+  }
+  .explain h2 { margin: 0 0 4px 0; font-size: 1.05rem; color: var(--green-dark); }
+  .explain .hint { margin: 0 0 14px 0; font-size: 0.8rem; color: var(--muted); }
+  .exp-row {
+    display: grid;
+    grid-template-columns: 150px 1fr 70px;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+  }
+  .exp-name small { display: block; color: var(--muted); font-size: 0.72rem; }
+  .bar-track { background: #eceff1; border-radius: 6px; height: 14px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; }
+  .bar-fill.pos { background: #2e7d32; }
+  .bar-fill.neg { background: #c62828; }
+  .exp-val { text-align: right; font-weight: 600; }
+  .exp-val.pos { color: #2e7d32; }
+  .exp-val.neg { color: #c62828; }
+  .legend { margin-top: 12px; font-size: 0.75rem; color: var(--muted); }
+  .legend .pos { color: #2e7d32; font-weight: 600; }
+  .legend .neg { color: #c62828; font-weight: 600; }
+  .note { margin-top: 14px; font-size: 0.8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🌾 Crop Recommendation System</h1>
+  <p class="subtitle">Enter soil and climate readings to get the recommended crop</p>
+
+  <div class="card">
+    <form method="POST">
+      {% for col in feature_order %}
+        {% set info = field_info[col] %}
+        <div class="field">
+          <label for="{{ col }}">{{ info.label }}</label>
+          <input
+            type="number"
+            step="{{ info.step }}"
+            min="{{ info.min }}"
+            max="{{ info.max }}"
+            id="{{ col }}"
+            name="{{ col }}"
+            value="{{ form_values.get(col, '') }}"
+            required
+          >
+        </div>
+      {% endfor %}
+
+      <div class="submit-row">
+        <button type="submit">Recommend Crop</button>
+      </div>
+    </form>
+
+    {% if prediction %}
+      <div class="result">
+        <div>Recommended Crop</div>
+        <div class="crop-name">{{ prediction }}</div>
+      </div>
+    {% endif %}
+
+
+    {% if prediction and explanation %}
+      <div class="explain">
+        <h2>Why this crop?</h2>
+        <p class="hint">How each input pushed the model toward or away from <b>{{ prediction }}</b> (SHAP values)</p>
+        {% for r in explanation %}
+          <div class="exp-row">
+            <div class="exp-name">{{ r.label }}<small>your value: {{ r.value }}</small></div>
+            <div class="bar-track">
+              <div class="bar-fill {{ 'pos' if r.positive else 'neg' }}" style="width: {{ r.width }}%"></div>
+            </div>
+            <div class="exp-val {{ 'pos' if r.positive else 'neg' }}">{{ '%+.2f'|format(r.shap) }}</div>
+          </div>
+        {% endfor %}
+        <div class="legend">
+          <span class="pos">Green</span> = pushes toward {{ prediction }} &nbsp;|&nbsp;
+          <span class="neg">Red</span> = pushes away from {{ prediction }}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if explain_error %}
+      <div class="note">{{ explain_error }}</div>
+    {% endif %}
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+  </div>
+
+  <footer>AI Smart Farming Assistant — Module 1: Crop Recommendation</footer>
+</div>
+</body>
+</html>
