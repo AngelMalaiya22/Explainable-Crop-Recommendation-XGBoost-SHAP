@@ -1,7 +1,6 @@
 # Crop Recommendation — Flask App
 
 ## Setup
-
 1. **Copy your saved model files** into `saved_models/` in this folder:
    - `crop_recommendation_xgb.pkl`
    - `crop_label_encoder.pkl`
